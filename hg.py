@@ -204,14 +204,19 @@ class Hypergrad_Calculator(nn.Module):
         # dot = torch.dot(self.grad_lower_level(x).view(-1), v.view(-1))
         # return torch.autograd.grad(dot, x, create_graph=True)[0].detach()
     def jac_vector_product(self, x, v):
+        # computing sobolov grad
+        self.upper_level_obj.kernel = self.lower_level_obj.regularizer.forward_operator.conv.weight.data
+        _, sobolov_grad = self.upper_level_obj.sobolev_norm()
         for param in self.lower_level_obj.regularizer.parameters():
             if param.requires_grad:
                 dot = torch.dot(self.grad_lower_level(x).view(-1), v.view(-1))
                 if self.grad_normalize:
                     grad_param = torch.autograd.grad(dot, param, create_graph=True)[0]
-                    param.grad = - grad_param/ torch.norm(grad_param)
+                    param.grad =  - grad_param/ torch.norm(grad_param)
                 else:
-                    param.grad = - torch.autograd.grad(dot, param, create_graph=False)[0].detach()
+                    param.grad =  - torch.autograd.grad(dot, param, create_graph=False)[0].detach()
+        for param in self.lower_level_obj.regularizer.forward_operator.parameters():
+            param.grad += sobolov_grad
         return 
     def hypergrad(self):
         if not self.lower_skip:

@@ -29,7 +29,7 @@ class Lower_Level(nn.Module):
         self.regularizer = regularizer
         self.measurement = measurement
         self.A = forward_operator
-        self.param = 2.5
+        self.param = 1
     def data_fidelity(self, x):
         # return 0.5 *torch.mean(torch.norm(self.A(x) - self.measurement, dim = (2, 3))**2)
         return 0.5 * torch.norm(self.A(x) - self.measurement)**2/ (self.measurement.shape[0])
@@ -37,14 +37,46 @@ class Lower_Level(nn.Module):
     def forward(self, x):
         return self.data_fidelity(x) + self.param * self.regularizer(x)
 class Upper_Level(nn.Module):
-    def __init__(self, y, operator, kernel):
+    def __init__(self, y, operator, kernel, kernel_original):
         super(Upper_Level, self).__init__()
         self.y = y
         self.A = operator
         self.kernel = kernel   
+        self.kernel_original = kernel_original.to(device)
+    def sobolev_norm(self):
+        """
+        Computes the Sobolev norm of the convolution operator defined by the kernel.
+        """
+        if self.kernel.device != self.kernel_original.device:
+            self.kernel = self.kernel.to(self.kernel_original.device)
+        self.kernel.requires_grad = True
+        kernel = self.kernel - self.kernel_original
+        # Compute L2 norm of the kernel (||k||_L2)
+        l2_norm = torch.norm(kernel, p=2)
+
+        # Compute gradients of the kernel in x and y directions (finite differences)
+        grad_x = kernel[:, :, :, 1:] - kernel[:, :, :, :-1]  # Difference in x-direction
+        grad_y = kernel[:, :, 1:, :] - kernel[:, :, :-1, :]  # Difference in y-direction
+
+        # Compute L2 norm of the gradients (||grad_x||_L2 and ||grad_y||_L2)
+        grad_x_norm = torch.norm(grad_x, p=2)
+        grad_y_norm = torch.norm(grad_y, p=2)
+
+        # Sobolev norm: ||A||_{H^1}^2 = ||k||_L2^2 + ||grad_x||_L2^2 + ||grad_y||_L2^2
+        sobolev_norm = torch.sqrt(l2_norm**2 + grad_x_norm**2 + grad_y_norm**2)
+        
+        # Calculate gradients with respect to the kernel
+        # Note: We need to set create_graph=True to compute higher-order derivatives
+        grad_l2 = torch.autograd.grad(l2_norm, self.kernel, create_graph=True)[0]
+        grad_grad_x = torch.autograd.grad(grad_x_norm, self.kernel, create_graph=True)[0]
+        grad_grad_y = torch.autograd.grad(grad_y_norm, self.kernel, create_graph=True)[0]
+
+        # Combine the gradients: we need to take the gradient of each component norm
+        gradient_sobolev_norm = grad_l2 + grad_grad_x + grad_grad_y
+        return sobolev_norm, gradient_sobolev_norm
     def forward(self, x):
         # return  torch.norm(x - self.x)**2/ (self.x.shape[0] * self.x.shape[1])
-        return torch.norm(self.A(x) - self.y)**2/ (self.y.shape[0] * self.y.shape[1])
+        return torch.norm(self.A(x) - self.y)**2/ (self.y.shape[0] * self.y.shape[1]) + self.sobolev_norm()[0]
 def initialize_optimizer(hypergrad, alpha, optimizer_type='MAID'):
     if optimizer_type == 'MAID':
         hypergrad.verbose = False
@@ -92,45 +124,70 @@ def save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting):
 # load image
 size_x = 270
 size_y = 270
-img_index = 4
+img_index = 6
 channels = 3
 noise_level = 0.01
 
-blur_kernel_original = gaussian_kernel(5, 2, 1)
-kernel_4d = blur_kernel_original.unsqueeze(0).unsqueeze(0)
-kernel_4d = kernel_4d.repeat(3, 1, 1, 1)
+blur_kernel_original = gaussian_kernel(5, 2, 1, channels)
+# kernel_4d = blur_kernel_original.unsqueeze(0).unsqueeze(0)
+# kernel_4d = kernel_4d.repeat(3, 1, 1, 1)
+kernel_4d = blur_kernel_original
 blur_original = nn.Conv2d(channels, channels, 5, padding = 2, bias = False, groups= channels)
 blur_original.weight.data = kernel_4d
 class blur (nn.Module):
     def __init__(self, kernel):
         super(blur, self).__init__()
         self.kernel = kernel
-        self.conv = nn.Conv2d(channels, channels, 5, padding = 2, bias = False, groups= channels, padding_mode= 'reflect')
+        self.conv = nn.Conv2d(channels, channels, 5, padding = 2, bias = False, groups= channels, padding_mode= 'zeros')
         self.conv.weight.requires_grad = True
+        self.conv.weight.data = kernel
     def forward(self, x):
-        if x.device != self.kernel.device:
-            self.kernel = self.kernel.to(x.device)
-            self.conv = self.conv.to(x.device)
-        self.conv.weight.data = self.kernel
+        if x.device != self.conv.weight.data.device:
+            self.conv.weight.data = self.conv.weight.data.to(x.device)
+        # self.conv.weight.data = self.kernel
         return self.conv(x)
 blur_obj = blur(kernel_4d)
-
 
 
 operator = blur_obj
 
 img , noisy_img = load_image_and_add_noise(img_index, size_x, size_y, channels, operator, noise_level)
+# visualise and save blurred image and original image
+if channels == 1:
+    plt.imshow(img.cpu().detach().squeeze().numpy(), cmap='gray')
+else:
+    plt.imshow(img.cpu().detach().squeeze().permute(1, 2, 0).numpy())
+plt.title('Original Image')
+plt.show()  
+plt.savefig(f'{os.getcwd()}/logs/original.png', bbox_inches='tight', dpi = 300)
+if channels == 1:
+    plt.imshow(noisy_img.cpu().detach().squeeze().numpy(), cmap='gray')
+else:
+    plt.imshow(noisy_img.cpu().detach().squeeze().permute(1, 2, 0).numpy())
+plt.title('Noisy Image, PSNR: {:.2f}'.format(psnr(img, noisy_img).mean().item()))
+plt.savefig(f'{os.getcwd()}/logs/noisy.png', bbox_inches='tight', dpi = 300)
+plt.show()
+
 init = noisy_img.clone()
-init = torch.zeros_like(init)
+# init = torch.zeros_like(init)
 # lower level regularizer
 regularizer = TV(channels, learnable_smoothing=False, make_non_learnable=True).to(device)
 regularizer.forward_operator = operator
 # ADP lower level and upper level
 Lower_Level_obj = Lower_Level(noisy_img, regularizer)
-lower_level = Lower_Level(noisy_img, regularizer, forward_operator= operator)#.to(device)
-upper_level = Upper_Level(noisy_img.to(device), operator, blur_kernel_original).to(device)
+lower_level = Lower_Level(noisy_img.to(device), regularizer, forward_operator= operator)#.to(device)
+upper_level = Upper_Level(noisy_img.to(device), operator, kernel_4d, kernel_4d).to(device)
 x_init = init.to(device)
 hypergrad = Hypergrad_Calculator(lower_level, upper_level, x_init = x_init, verbose= True)
+
+# regularized solution
+classic_solution = hypergrad.FISTA(x_init, 1e-3, 1000)
+if channels == 1:
+    plt.imshow(classic_solution.cpu().detach().squeeze().numpy(), cmap='gray')
+else:
+    plt.imshow(classic_solution.cpu().detach().squeeze().permute(1, 2, 0).numpy())
+plt.title('Regularized Solution PSNR: {:.2f}'.format(psnr(img, classic_solution.detach().cpu()).mean().item()))
+plt.show()
 
 def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha, eps0, setting , mode, budget, threshold):
     optimizer = initialize_optimizer(hypergrad, alpha)
@@ -159,11 +216,17 @@ def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha
         psnr_value = psnr_fn(data, init.cpu()).mean().item()
         print("PSNR: ", psnr_value, "Loss: ", loss_val.item())
         if i % 10 == 0:
-            plt.imshow(init.cpu().detach().squeeze().permute(1, 2, 0).numpy())
+            if channels == 1:
+                plt.imshow(init.cpu().detach().squeeze().numpy(), cmap='gray')
+            else:
+                plt.imshow(init.cpu().detach().squeeze().permute(1, 2, 0).numpy())
             plt.show()
             plt.savefig(f'{directory}/logs/ADP.png')
             kernel = hypergrad.lower_level_obj.regularizer.forward_operator.conv.weight.data.squeeze().cpu().detach().numpy()
-            plt.imshow(kernel[0])
+            if channels == 1:
+                plt.imshow(kernel.squeeze())
+            else:
+                plt.imshow(kernel[0])
             plt.colorbar()
             plt.show()
             plt.savefig(f'{directory}/logs/ADP_kernel.png')

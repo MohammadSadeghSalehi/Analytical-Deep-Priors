@@ -48,11 +48,11 @@ def load_image_and_add_noise(index, x_size, y_size, channels, operator, noise_le
 
         # Apply the operator to the image
         if operator:
-            img_tensor = operator(img_tensor)
+            blurred = operator(img_tensor)
         
         # Add Gaussian noise
-        noise = torch.randn(img_tensor.size()) * noise_level
-        noisy_img_tensor = img_tensor + noise
+        noise = torch.randn(blurred.size()) * noise_level
+        noisy_img_tensor = blurred + noise
         
         # Clamp values to be within [0, 1]
         noisy_img_tensor = torch.clamp(noisy_img_tensor, 0, 1)
