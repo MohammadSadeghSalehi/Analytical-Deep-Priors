@@ -6,7 +6,7 @@ class FoE(nn.Module):
     Field of Experts convex regularizer with learnable weights and smoothed L1 potential.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride = 1, \
-        learnable_smoothing = False, learnable_weights = False, zero_mean = False):
+        learnable_smoothing = False, learnable_weights = False, zero_mean = False, make_non_learnable = True):
         super(FoE, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -25,6 +25,25 @@ class FoE(nn.Module):
         if learnable_weights:
             self.weights = nn.Parameter(self.weights)
         self.coef = nn.Parameter(torch.tensor(0.))
+           # Option to make everything non-learnable
+        if make_non_learnable:
+            self.make_all_non_learnable()
+
+    def make_all_non_learnable(self):
+        """Sets all parameters to non-learnable."""
+        # Make convolution weights non-learnable
+        self.conv.weight.requires_grad_(False)
+
+        # Make smoothing non-learnable if it exists
+        if self.smoothing is not None:
+            self.smoothing.requires_grad_(False)
+
+        # Make weights non-learnable
+        if isinstance(self.weights, nn.Parameter):
+            self.weights.requires_grad_(False)
+
+        # Make coef non-learnable
+        self.coef.requires_grad_(False)
     def init_weights(self):
         # zero-mean Xavier initialization
         weights = nn.init.xavier_normal_(self.conv.weight.data)

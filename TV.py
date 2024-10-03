@@ -14,7 +14,7 @@ class TV(nn.Module):
 
         # Optional learnable smoothing
         if learnable_smoothing:
-            self.smoothing = nn.Parameter(torch.tensor(-3.0))
+            self.smoothing = nn.Parameter(torch.tensor(-8.0))
         
         # Optionally make all existing parameters non-learnable
         if make_non_learnable:
