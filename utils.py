@@ -40,6 +40,53 @@ def gaussian_kernel(size: int, mean: float, std: float, channels: int):
     
     return kernel_4d
 
+# Motion blur kernel: Vertical, Horizontal, Diagonal
+def motion_blur_kernel(size: int, blur_type: str, channels: int):
+    """
+    Creates a 4D Motion Blur Kernel for convolution.
+    blur_type can be 'vertical', 'horizontal', or 'diagonal'.
+    """
+    kernel_2d = torch.zeros((size, size))
+    
+    if blur_type == 'vertical':
+        kernel_2d[:, size // 2] = 1.0  # Middle column is 1
+    elif blur_type == 'horizontal':
+        kernel_2d[size // 2, :] = 1.0  # Middle row is 1
+    elif blur_type == 'diagonal':
+        for i in range(size):
+            kernel_2d[i, i] = 1.0  # Diagonal elements are 1
+
+    # Normalize kernel to sum to 1
+    kernel_2d = kernel_2d / kernel_2d.sum()
+
+    # Expand to 4D and repeat for the number of channels
+    kernel_4d = kernel_2d.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, size, size)
+    kernel_4d = kernel_4d.repeat(channels, 1, 1, 1)  # Repeat for the number of channels
+    
+    return kernel_4d
+
+# Disc blur kernel
+def disc_blur_kernel(size: int, channels: int):
+    """
+    Creates a 4D Disc Blur Kernel for convolution.
+    The kernel is a circular mask with a smooth edge.
+    """
+    radius = size // 2
+    y, x = torch.meshgrid(torch.arange(-radius, radius + 1), torch.arange(-radius, radius + 1))
+    distance = torch.sqrt(x ** 2 + y ** 2)
+    
+    # Create a disc mask where distance is less than or equal to the radius
+    disc_2d = (distance <= radius).float()
+    
+    # Normalize kernel to sum to 1
+    disc_2d = disc_2d / disc_2d.sum()
+
+    # Expand to 4D and repeat for the number of channels
+    kernel_4d = disc_2d.unsqueeze(0).unsqueeze(0)  # Shape: (1, 1, size, size)
+    kernel_4d = kernel_4d.repeat(channels, 1, 1, 1)  # Repeat for the number of channels
+    
+    return kernel_4d
+
 def data_update(hypergrad, lower_init, lower_data, upper_data):
     hypergrad.lower_level_obj.measurement = lower_data
     hypergrad.upper_level_obj.x = upper_data
