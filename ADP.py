@@ -62,12 +62,11 @@ def initialize_log_values(data, noisy, init, hypergrad, logs_dict, device, eps0,
 def update_data(hypergrad, init_data, noisy_data, data, device):
     return data_update(hypergrad, init_data.to(device), noisy_data.to(device), data.to(device))
 
-def log_metrics(logs_dict, hypergrad, optimizer, data, psnr_fn, init_loader, loss_batch, psnr_batch, i, epoch, directory):
-    psnr_batch.append(psnr_fn(data, init_loader[i].cpu()).mean().item())
+def log_metrics(logs_dict, hypergrad, optimizer, data, psnr_fn, directory, eps0, alpha, setting):
     logs_dict["eps"].append(hypergrad.lower_tol)
     logs_dict["step"].append(optimizer.lr)
-    logs_dict["psnr_batch"].append(psnr_batch[-1])
-    save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting, p, q, opt_alg, epoch)
+    logs_dict["psnr"].append(psnr_fn(data, hypergrad.x_init.cpu()).mean().item())
+    save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting)
 
 def save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting):
     # Define file paths based on the setting
