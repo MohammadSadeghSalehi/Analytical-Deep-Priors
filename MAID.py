@@ -60,11 +60,17 @@ class MAID(SGD):
             self.lr = self.old_step
             print("loss old", loss_old.item(), "loss", self.loss(x_new).item(), f'eps: {self.eps}', f'lr: {self.lr}', f'iter: {i}')
         return False , self.hypergrad.x_init, loss_old
+    # def revert(self, params_before):
+    #     # Revert to the old parameters if condition not met
+    #     for i, param in enumerate(self.param_groups[0]['params']):
+    #         if param.requires_grad and param.grad  is not None:
+    #             param.data = params_before[i].data
     def revert(self, params_before):
         # Revert to the old parameters if condition not met
-        for i, param in enumerate(self.param_groups[0]['params']):
-            if param.grad is not None:
-                param.data = params_before[i].data
+        filtered_params = [p for p in self.param_groups[0]['params'] if p.requires_grad and p.grad is not None]
+        
+        for i, param in enumerate(filtered_params):
+            param.data = params_before[i].data
     def step(self, closure=None):
         """
         Performs a conditional parameter update.
@@ -77,16 +83,16 @@ class MAID(SGD):
         self.old_step = self.lr
         self.eps_old = self.eps            
         # Save current parameters
-        params_before = [p.clone() for p in self.param_groups[0]['params'] if p.grad is not None]
+        params_before = [p.clone() for p in self.param_groups[0]['params'] if p.requires_grad and p.grad is not None]
 
         # gradient of parameters
-        grad_params = [p.grad for p in self.param_groups[0]['params'] if p.grad is not None]
+        grad_params = [p.grad for p in self.param_groups[0]['params'] if p.requires_grad and p.grad is not None]
         
         # # Perform the standard SGD step (provisionally)
         # super(MAID, self).step()
 
         # Get updated parameters
-        params_after = [p.clone() for p in self.param_groups[0]['params'] if p.grad is not None]
+        params_after = [p.clone() for p in self.param_groups[0]['params'] if p.requires_grad and p.grad is not None]
         if not self.fixed_lr:
             success, x_new , loss = self.linesearch(grad_params, params_before)
         else:

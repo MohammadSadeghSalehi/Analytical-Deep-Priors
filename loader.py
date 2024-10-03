@@ -6,7 +6,8 @@ import torchvision.transforms as transforms
 
 def load_image_and_add_noise(index, x_size, y_size, channels, operator, noise_level):
     image_dir = './images'
-    image_files = sorted(os.listdir(image_dir))  # Sorting to ensure consistent indexing
+    valid_extensions = ['.jpg', '.jpeg', '.png', '.bmp', '.gif', '.tiff']  
+    image_files = [f for f in sorted(os.listdir(image_dir)) if os.path.splitext(f)[1].lower() in valid_extensions]
     if index >= len(image_files):
         raise ValueError(f"Index {index} is out of range. Only {len(image_files)} images found.")
     
@@ -57,7 +58,7 @@ def load_image_and_add_noise(index, x_size, y_size, channels, operator, noise_le
         noisy_img_tensor = torch.clamp(noisy_img_tensor, 0, 1)
     
     # Return the original and noisy images
-    return img_tensor, noisy_img_tensor
+    return img_tensor.unsqueeze(0), noisy_img_tensor.unsqueeze(0)
 
 
     

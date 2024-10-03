@@ -205,12 +205,13 @@ class Hypergrad_Calculator(nn.Module):
         # return torch.autograd.grad(dot, x, create_graph=True)[0].detach()
     def jac_vector_product(self, x, v):
         for param in self.lower_level_obj.regularizer.parameters():
-            dot = torch.dot(self.grad_lower_level(x).view(-1), v.view(-1))
-            if self.grad_normalize:
-                grad_param = torch.autograd.grad(dot, param, create_graph=True)[0]
-                param.grad = - grad_param/ torch.norm(grad_param)
-            else:
-                param.grad = - torch.autograd.grad(dot, param, create_graph=False)[0].detach()
+            if param.requires_grad:
+                dot = torch.dot(self.grad_lower_level(x).view(-1), v.view(-1))
+                if self.grad_normalize:
+                    grad_param = torch.autograd.grad(dot, param, create_graph=True)[0]
+                    param.grad = - grad_param/ torch.norm(grad_param)
+                else:
+                    param.grad = - torch.autograd.grad(dot, param, create_graph=False)[0].detach()
         return 
     def hypergrad(self):
         if not self.lower_skip:
