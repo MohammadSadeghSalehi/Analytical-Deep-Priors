@@ -79,3 +79,4 @@ def save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting):
     # Save logs and regularizer state
     torch.save(logs_dict, log_file)
     torch.save(hypergrad.lower_level_obj.regularizer.state_dict(), regularizer_file)
+    
