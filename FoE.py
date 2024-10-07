@@ -6,7 +6,7 @@ class FoE(nn.Module):
     Field of Experts convex regularizer with learnable weights and smoothed L1 potential.
     """
     def __init__(self, in_channels, out_channels, kernel_size, stride = 1, \
-        learnable_smoothing = False, learnable_weights = False, zero_mean = False, make_non_learnable = True):
+        learnable_smoothing = False, learnable_weights = False, zero_mean = False, make_non_learnable = False):
         super(FoE, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
