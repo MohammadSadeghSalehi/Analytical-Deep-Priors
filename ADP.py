@@ -10,12 +10,17 @@ from utils import *
 from MAID import *
 from TV import *
 from FoE import *
-from matplotlib.colors import LogNorm
-
 
 torch.manual_seed(0)
 torch.cuda.manual_seed(0)
 np.random.seed(0)
+
+# load image
+size_x = 300
+size_y = 400
+img_index = 10
+channels = 3
+noise_level = 0.02
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")
@@ -25,6 +30,8 @@ else:
     device = torch.device("cpu")
 
 print(f"Using device: {device}")
+
+problem_type = "deblurring" # "deblurring", "both_B" , "semiblind"
 class Lower_Level(nn.Module):
     def __init__(self, measurement, regularizer, forward_operator = lambda x: x):
         super(Lower_Level, self).__init__()
@@ -79,6 +86,9 @@ class Upper_Level(nn.Module):
         return sobolev_norm, gradient_sobolev_norm
     def forward(self, x):
         # return  torch.norm(x - self.x)**2/ (self.x.shape[0] * self.x.shape[1])
+        if problem_type == "both_B":
+            B_conv = blur(self.kernel)
+            return torch.norm(B_conv(x) - self.y)**2/ (self.y.shape[0] * self.y.shape[1]) + self.reg_param * self.sobolev_norm()[0]
         return torch.norm(self.A(x) - self.y)**2/ (self.y.shape[0] * self.y.shape[1]) + self.reg_param * self.sobolev_norm()[0]
 def initialize_optimizer(hypergrad, alpha, optimizer_type='MAID'):
     hypergrad.warm_start = False
@@ -127,13 +137,6 @@ def save_logs(logs_dict, hypergrad, directory, eps0, alpha, setting):
     torch.save(logs_dict, log_file)
     torch.save(hypergrad.lower_level_obj.regularizer.state_dict(), regularizer_file)
 
-# load image
-size_x = 300
-size_y = 400
-img_index = 10
-channels = 3
-noise_level = 0.02
-
 # kernel_4d = gaussian_kernel(5, 2, 1, channels)
 
 class blur (nn.Module):
@@ -151,51 +154,31 @@ class blur (nn.Module):
         # self.conv.weight.data = self.kernel
         return self.conv(x)
 
-init_kernel = gaussian_kernel(5, 2, 0.5, channels) 
+init_kernel = gaussian_kernel(5, 2, 1, channels) 
 init_kernel2 = motion_blur_kernel(5, 'diagonal', channels)
 # init_kernel2 = disc_blur_kernel(5, channels)
 
 init_operator = blur(init_kernel)
 init_operator_2 = blur(init_kernel2)
 # plot kernel
-if channels == 1:
-    plt.imshow(init_kernel.cpu().detach().squeeze().squeeze().numpy())
-    plt.colorbar()
-    plt.savefig(f'{os.getcwd()}/logs/kernel_init.png', bbox_inches='tight', dpi = 300)
-    plt.close()
-    # plt.show()
-else:
-    # plotting 3 channels
-    plt.imshow(init_kernel[0].cpu().detach().squeeze().numpy())
-    plt.colorbar()
-    plt.savefig(f'{os.getcwd()}/logs/kernel_init_1c.png', bbox_inches='tight', dpi = 300)
-    # plt.show()
-    plt.close()
-    plt.imshow(init_kernel[1].cpu().detach().squeeze().numpy())
-    plt.colorbar()
-    plt.savefig(f'{os.getcwd()}/logs/kernel_init_2c.png', bbox_inches='tight', dpi = 300)
-    # plt.show()
-    plt.close()
-    plt.imshow(init_kernel[2].cpu().detach().squeeze().numpy())
-    plt.colorbar()
-    plt.savefig(f'{os.getcwd()}/logs/kernel_init_3c.png', bbox_inches='tight', dpi = 300)
-    # plt.show()
-    plt.close()
-# kernel_4d = gaussian_kernel(5, 2,1, channels) # can be corrupted
-kernel_4d = motion_blur_kernel(5, 'diagonal', channels) 
-# kernel_4d = disc_blur_kernel(5, channels)
+plot_and_save_kernel(init_kernel, channels=channels, kernel_name="kernel_init", dpi=300)
+if problem_type == "both_B":
+    plot_and_save_kernel(init_kernel2, channels=channels, kernel_name="kernel_init2", dpi=300)
+kernel_4d = init_kernel.clone()
 operator = blur(kernel_4d)
-img , noisy_img = load_image_and_add_noise(img_index, size_x, size_y, channels, init_operator, 0)
-noisy_img = init_operator_2(noisy_img) + torch.randn_like(noisy_img) * noise_level
+if problem_type == "semiblind":
+    img , noisy_img = load_image_and_add_noise(img_index, size_x, size_y, channels, init_operator, 0)
+    noisy_img = init_operator_2(noisy_img) + torch.randn_like(noisy_img) * noise_level
+else:
+    img , noisy_img = load_image_and_add_noise(img_index, size_x, size_y, channels, operator, noise_level)
 # visualise and save blurred image and original image
 if channels == 1:
     plt.imshow(img.cpu().detach().squeeze().numpy(), cmap='gray')
 else:
     plt.imshow(img.cpu().detach().squeeze().permute(1, 2, 0).numpy())
-# plt.title('Original Image')
 plt.axis('off')
 plt.savefig(f'{os.getcwd()}/logs/original.png', bbox_inches='tight', dpi = 300)
-plt.show()  
+plt.close()
 if channels == 1:
     plt.imshow(noisy_img.cpu().detach().squeeze().numpy(), cmap='gray')
 else:
@@ -203,7 +186,7 @@ else:
 plt.title('PSNR: {:.2f}'.format(psnr(img, noisy_img).mean().item()))
 plt.axis('off')
 plt.savefig(f'{os.getcwd()}/logs/noisy.png', bbox_inches='tight', dpi = 300)
-plt.show()
+plt.close()
 
 init = noisy_img.clone()
 # init = torch.zeros_like(init)
@@ -221,7 +204,7 @@ x_init = init.to(device)
 hypergrad = Hypergrad_Calculator(lower_level, upper_level, x_init = x_init, verbose= True)
 
 # regularized solution
-classic_solution = hypergrad.FISTA(x_init, 1e-3, 100)
+classic_solution = hypergrad.FISTA(x_init, 1e-3, 150)
 if channels == 1:
     plt.imshow(classic_solution.cpu().detach().squeeze().numpy(), cmap='gray')
 else:
@@ -229,8 +212,8 @@ else:
 plt.axis('off')
 plt.title('PSNR: {:.2f}'.format(psnr(img, classic_solution.detach().cpu()).mean().item()))
 plt.savefig(f'{os.getcwd()}/logs/classic_solution.png', bbox_inches='tight', dpi = 300)
-plt.show()
-
+# plt.show()
+plt.close()
 def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha, eps0, setting , mode, budget, threshold):
     optimizer = initialize_optimizer(hypergrad, alpha, optimizer_type='MAID')
     logs_dict = initialize_logs(setting, mode)
@@ -280,51 +263,9 @@ def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha
         # plotting kernel_differences
         kernel = hypergrad.lower_level_obj.regularizer.forward_operator.conv.weight.data.to(kernel_4d.device)
         kernel_diff = torch.abs(kernel - kernel_4d).squeeze().cpu().detach().numpy()
-        if channels == 1:
-            plt.imshow(kernel_diff.squeeze())
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_diff.png', bbox_inches='tight', dpi = 300)
-            # plt.show()
-        else:
-            plt.imshow(kernel_diff[0])
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_diff_1c.png', bbox_inches='tight', dpi = 300)
-            plt.close()
-            # plt.show()
-            plt.imshow(kernel_diff[1])
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_diff_2c.png', bbox_inches='tight', dpi = 300)
-            plt.close()
-            # plt.show()
-            plt.imshow(kernel_diff[2])
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_diff_3c.png', bbox_inches='tight', dpi = 300)
-            plt.close()
-            # plt.show()
-            
+        plot_and_save_kernel(kernel_diff, channels=channels, kernel_name="kernel_diff", dpi=300)
         #plotting kernel
-        if channels == 1:
-            plt.imshow(kernel.squeeze().cpu().detach().numpy())
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel.png', bbox_inches='tight', dpi = 300)
-            # plt.show()
-        else:
-            plt.imshow(kernel[0].cpu().detach().squeeze().numpy())
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_1c.png', bbox_inches='tight', dpi = 300)
-            # plt.show()
-            plt.close()
-            plt.imshow(kernel[1].cpu().detach().squeeze().numpy())
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_2c.png', bbox_inches='tight', dpi = 300)
-            # plt.show()
-            plt.close()
-            plt.imshow(kernel[2].cpu().detach().squeeze().numpy())
-            plt.colorbar()
-            plt.savefig(f'{directory}/logs/kernel_3c.png', bbox_inches='tight', dpi = 300)
-            # plt.show()
-            plt.close()
-            
+        plot_and_save_kernel(kernel, channels=channels, kernel_name="kernel", dpi=300)
         loss.append(loss_val.item())
         psnr.append(psnr_value)
         
@@ -333,8 +274,7 @@ def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha
         if hypergrad.lower_tol < threshold:
             print("Stopping Criterion")
             break
-        
-    
+           
     # Save the final logs
     torch.save(logs_dict, f'{directory}/Logs/final_logs_dict.pt')
     
@@ -343,7 +283,7 @@ upper_iter = 100
 alpha = 1e-6
 eps0 = 1e0
 setting = "Gaussian_blur"
-mode = "TV_fixed2"  #"TV_fixed" "FoE_learnable" "TV_semi_blind"
+mode = problem_type + "TV_fixed2"  #"TV_fixed" "FoE_learnable" "TV_semi_blind" 
 budget = 10
 threshold = 1e-6
 hypergrad.upper_level_obj.reg_param = 100

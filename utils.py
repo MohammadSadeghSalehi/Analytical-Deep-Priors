@@ -1,5 +1,10 @@
 import torch
 import deepinv as dinv
+from matplotlib.colors import LogNorm
+from matplotlib.colors import Normalize, SymLogNorm
+import matplotlib.pyplot as plt
+import os
+import numpy as np
 # def psnr(img1, img2):
 #     img1 = torch.clip(img1, 0, 1)
 #     img2 = torch.clip(img2, 0, 1)
@@ -94,3 +99,46 @@ def data_update(hypergrad, lower_init, lower_data, upper_data):
     return hypergrad
 def total_iter(batch, epoch, n_batches):
     return batch + epoch * n_batches
+
+def plot_and_save_kernel(kernel, channels=1, save_path=None, kernel_name="kernel", dpi=300):
+    """
+    Plots and saves kernel images for 1-channel or multi-channel data with SymLogNorm scaling.
+    
+    Args:
+        kernel (torch.Tensor): The kernel tensor to plot, expected to be on CPU.
+        channels (int): Number of channels in the kernel (1 for grayscale, 3 for RGB).
+        save_path (str, optional): Directory to save the output images. Defaults to current working directory.
+        kernel_name (str, optional): Name prefix for the saved images. Defaults to 'kernel'.
+        dpi (int, optional): DPI for the saved image. Defaults to 300.
+    """
+    # Set default save path if not provided
+    if save_path is None:
+        save_path = os.path.join(os.getcwd(), 'logs')
+    # cmap = 'seismic'
+    cmap = 'viridis'
+    # Ensure the save directory exists
+    os.makedirs(save_path, exist_ok=True)
+    
+    # Get numpy representation of the kernel for normalization
+    if type(kernel) == torch.Tensor:
+        kernel_np = kernel.cpu().detach().numpy()
+    else:
+        kernel_np = kernel
+    # Apply symmetric logarithmic normalization
+    norm = SymLogNorm(linthresh=1e-6, vmin=np.min(kernel_np), vmax=np.max(kernel_np), base=10)
+    if kernel_name == "kernel_diff":
+        norm = Normalize(vmin=0, vmax=np.max(kernel_np))
+    # Plot for a single channel
+    if channels == 1:
+        plt.imshow(kernel_np.squeeze(), norm=norm, cmap=cmap)
+        plt.colorbar()
+        plt.savefig(f'{save_path}/{kernel_name}.png', bbox_inches='tight', dpi=dpi)
+        plt.close()
+    # Plot for three channels
+    else:
+        kernel = torch.tensor(kernel)
+        for i in range(min(channels, 3)):  # Plot the first 3 channels if channels > 3
+            plt.imshow(kernel[i].cpu().detach().squeeze().numpy(), norm=norm, cmap=cmap)
+            plt.colorbar()
+            plt.savefig(f'{save_path}/{kernel_name}_{i+1}c.png', bbox_inches='tight', dpi=dpi)
+            plt.close()
