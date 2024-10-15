@@ -43,12 +43,14 @@ class TV(nn.Module):
         return torch.sum(nabla_xy)
 
     def forward(self, x):
+        # Pad x
+        x = F.pad(x, (0, 1, 0, 1), mode = 'replicate')
         # Compute finite differences
         dx, dy = self.forward_difference(x)
         
         # Pad dx and dy to ensure they have the same spatial dimensions
-        dx_padded = F.pad(dx, (0, 1, 0, 0))  # Pad last dimension (width) by 1 on the right
-        dy_padded = F.pad(dy, (0, 0, 0, 1))  # Pad second-to-last dimension (height) by 1 on the bottom
+        dx_padded = F.pad(dx, (0, 1, 0, 0), mode= 'constant', value=0)  # Pad last dimension (width) by 1 on the right
+        dy_padded = F.pad(dy, (0, 0, 0, 1), mode= 'constant', value=0)  # Pad second-to-last dimension (height) by 1 on the bottom
         
         # Combine the padded differences
         combined_diff = torch.cat([dx_padded, dy_padded], dim=-1)  # Concatenate along the last dimension

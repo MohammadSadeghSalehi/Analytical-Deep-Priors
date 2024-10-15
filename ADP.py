@@ -18,9 +18,9 @@ np.random.seed(0)
 # load image
 size_x = 300
 size_y = 400
-img_index = 10
+img_index = 15
 channels = 3
-noise_level = 0.02
+noise_level = 5/255
 
 if torch.backends.mps.is_available():
     device = torch.device("mps")
@@ -145,7 +145,7 @@ class blur (nn.Module):
         self.kernel = kernel
         kernel_size = kernel.shape[-1]
         padding = kernel_size // 2
-        self.conv = nn.Conv2d(channels, channels, kernel_size, padding = padding, bias = False, groups= channels, padding_mode= 'zeros')
+        self.conv = nn.Conv2d(channels, channels, kernel_size, padding = padding, bias = False, groups= channels, padding_mode= 'replicate')
         self.conv.weight.requires_grad = True
         self.conv.weight.data = kernel
     def forward(self, x):
@@ -154,19 +154,19 @@ class blur (nn.Module):
         # self.conv.weight.data = self.kernel
         return self.conv(x)
 
-init_kernel = gaussian_kernel(5, 2, 1, channels) 
-init_kernel2 = motion_blur_kernel(5, 'diagonal', channels)
-# init_kernel2 = disc_blur_kernel(5, channels)
+init_kernel2 = gaussian_kernel(5, 2, 0.5, channels) 
+init_kernel = motion_blur_kernel(5, 'diagonal', channels)
+# init_kernel = gaussian_kernel(5, 2, 2, channels)
+# init_kernel = disc_blur_kernel(5, channels)
 
 init_operator = blur(init_kernel)
 init_operator_2 = blur(init_kernel2)
 # plot kernel
 plot_and_save_kernel(init_kernel, channels=channels, kernel_name="kernel_init", dpi=300)
-if problem_type == "both_B":
-    plot_and_save_kernel(init_kernel2, channels=channels, kernel_name="kernel_init2", dpi=300)
 kernel_4d = init_kernel.clone()
 operator = blur(kernel_4d)
 if problem_type == "semiblind":
+    plot_and_save_kernel(init_kernel2, channels=channels, kernel_name="kernel_init2", dpi=300)
     img , noisy_img = load_image_and_add_noise(img_index, size_x, size_y, channels, init_operator, 0)
     noisy_img = init_operator_2(noisy_img) + torch.randn_like(noisy_img) * noise_level
 else:
@@ -204,11 +204,11 @@ x_init = init.to(device)
 hypergrad = Hypergrad_Calculator(lower_level, upper_level, x_init = x_init, verbose= True)
 
 # regularized solution
-classic_solution = hypergrad.FISTA(x_init, 1e-3, 150)
+classic_solution = hypergrad.FISTA(x_init, 1e-3, 100)
 if channels == 1:
     plt.imshow(classic_solution.cpu().detach().squeeze().numpy(), cmap='gray')
 else:
-    plt.imshow(classic_solution.cpu().detach().squeeze().permute(1, 2, 0).numpy())
+    plt.imshow(classic_solution[:,:,:,:].cpu().detach().squeeze().permute(1, 2, 0).numpy(), vmin=0, vmax=1)
 plt.axis('off')
 plt.title('PSNR: {:.2f}'.format(psnr(img, classic_solution.detach().cpu()).mean().item()))
 plt.savefig(f'{os.getcwd()}/logs/classic_solution.png', bbox_inches='tight', dpi = 300)
@@ -279,11 +279,11 @@ def main_solver(hypergrad, data, noisy, init, device, psnr_fn, upper_iter, alpha
     torch.save(logs_dict, f'{directory}/Logs/final_logs_dict.pt')
     
 # Run the main solver
-upper_iter = 100
+upper_iter = 41
 alpha = 1e-6
 eps0 = 1e0
-setting = "Gaussian_blur"
-mode = problem_type + "TV_fixed2"  #"TV_fixed" "FoE_learnable" "TV_semi_blind" 
+setting = "motion_blur"
+mode = problem_type + "TV_semi_blind"  #"TV_fixed" "FoE_learnable" "TV_semi_blind" 
 budget = 10
 threshold = 1e-6
 hypergrad.upper_level_obj.reg_param = 100

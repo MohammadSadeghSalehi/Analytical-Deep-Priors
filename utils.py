@@ -125,7 +125,11 @@ def plot_and_save_kernel(kernel, channels=1, save_path=None, kernel_name="kernel
     else:
         kernel_np = kernel
     # Apply symmetric logarithmic normalization
-    norm = SymLogNorm(linthresh=1e-6, vmin=np.min(kernel_np), vmax=np.max(kernel_np), base=10)
+    linthresh = 1e-6
+    if np.min(kernel_np) > 0: # If all values are positive
+        norm = LogNorm(vmin=np.min(kernel_np), vmax=np.max(kernel_np))
+    else:
+        norm = SymLogNorm(linthresh=linthresh, vmin=np.min(kernel_np), vmax=np.max(kernel_np), base=10)
     if kernel_name == "kernel_diff":
         norm = Normalize(vmin=0, vmax=np.max(kernel_np))
     # Plot for a single channel
@@ -139,6 +143,8 @@ def plot_and_save_kernel(kernel, channels=1, save_path=None, kernel_name="kernel
         kernel = torch.tensor(kernel)
         for i in range(min(channels, 3)):  # Plot the first 3 channels if channels > 3
             plt.imshow(kernel[i].cpu().detach().squeeze().numpy(), norm=norm, cmap=cmap)
-            plt.colorbar()
+            cbar = plt.colorbar()
+            # cbar.set_ticks([np.min(kernel_np), -1e-6, 0, 1e-6, np.max(kernel_np)])
+            # cbar.set_ticklabels([f'{np.min(kernel_np):.1e}', '-1e-6', '0', '1e-6', f'{np.max(kernel_np):.1e}'])
             plt.savefig(f'{save_path}/{kernel_name}_{i+1}c.png', bbox_inches='tight', dpi=dpi)
             plt.close()
