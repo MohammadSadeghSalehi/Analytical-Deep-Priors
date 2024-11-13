@@ -202,7 +202,7 @@ class ADP_eln(LightningModule):
         self.other = other # other reconstruction for comparison
         self.final = None
     def forward(self,x):
-        for i in range(100):
+        for i in range(50):
             Bx = torch.matmul(self.B,x)
             x=x-self.lamb*(torch.matmul(self.B.transpose(0,1),Bx-self.y)+self.al_l2*x) #gradient step
             x = proxl1(x,self.al_l1*self.lamb) #prox step
@@ -217,7 +217,7 @@ class ADP_eln(LightningModule):
         x = self.forward(x)
         loss_unroll.append((torch.linalg.norm(torch.matmul(A,x)-ydelta)**2).detach().numpy())
         time_unroll.append(T.time()-time_start)
-        self.total_iter += 100
+        self.total_iter += 50
         self.unroll_iter.append(self.total_iter)
         Ax_out = torch.matmul(self.A,x)
         
@@ -250,26 +250,6 @@ class ADP_eln(LightningModule):
             x_adp = self.x_iter
         else:
             x_adp = self.forward(self.x_iter).detach()
-        
-        fig = plt.figure()
-        plt.plot(torch.arange(-1+h/2,1,h,dtype=torch.float), self.gr_tr, label='truth')
-        plt.plot(torch.arange(-1+h/2,1,h,dtype=torch.float), x_adp, label='adp')
-        plt.legend()
-        
-        self.logger.experiment.add_figure('reconstruction', fig, global_step = self.current_epoch)
-        
-        # log figure of current solution and some othor solution for comparison
-        if self.other is not None:
-            fig2 = plt.figure()
-            plt.plot(torch.arange(-1+h/2,1,h,dtype=torch.float), self.other, label='other')
-            plt.plot(torch.arange(-1+h/2,1,h,dtype=torch.float), x_adp, label='adp')
-            plt.legend()
-            
-            self.logger.experiment.add_figure('comparison', fig2, global_step = self.current_epoch)
-        
-        # log reconstruction error
-        self.log('reconstruction error', 2*F.l1_loss(x_adp[:,0],self.gr_tr))
-    
     def configure_optimizers(self):
         return torch.optim.SGD(self.parameters(), lr = 0.1)
     
@@ -301,10 +281,10 @@ xk = torch.zeros_like(xk)
 R_el = y_norm2/4
 lamb=1
 if unrolling:
-    model = ADP_eln(A, ydelta, xk, adp_al1, adp_al2, 1, False, x, x_eln, unroll_iter)
+    model = ADP_eln(A, ydelta, xk, adp_al1, adp_al2, 1, True, x, x_eln, unroll_iter)
     data = random_input()
 
-    trainer = Trainer(accelerator="cpu", max_epochs=1000)
+    trainer = Trainer(accelerator="cpu", max_epochs=4000)
     trainer.fit(model, DataLoader(data, batch_size=1))
 
     print(str('ready (') + str(model.k) + str(')'))
@@ -317,16 +297,7 @@ if unrolling:
     print('ADP eln LISTA infinity')
     print(error)
     unroll_iter = model.unroll_iter
-    # show parameters (the operator B)
-    # plt.figure()
-    # plt.subplot(1,2,1)
-    # plt.imshow(A.detach(),vmin=A.min(),vmax=A.max())
-    # plt.subplot(1,2,2)
-    # plt.imshow(model.B.detach(),vmin=model.B.min(),vmax=model.B.max())
-    # plt.colorbar()
-    # plt.savefig('B_adp.png', dpi=300, bbox_inches='tight')
-    # plt.close()
-    # First plot: Heatmap of A
+    
     plt.figure(figsize=(8, 8))
     plt.imshow(A.detach(), vmin=A.min(), vmax=A.max())
     plt.colorbar()  # Adding colorbar for A if needed
@@ -343,9 +314,9 @@ if unrolling:
     # plot the results
     plt.figure(figsize=(8, 8))
     plt.plot(t, x, label='truth')
-    plt.plot(t, model.final, label='ADP Unrolling')
+    plt.plot(t, model.final, label='ADP LISTA $L=\infty$')
     plt.plot(t, ydelta, label='Noisy data')
-    plt.title(f"ADP-ELN Error (l1): {(abs(model.final.reshape(x.shape) - x)).sum() * h:.3f}")
+    plt.title(f"ADP-LISTA $L=\infty$ Error (l1): {(abs(model.final.reshape(x.shape) - x)).sum() * h:.3f}")
     plt.legend(loc='best')
     plt.savefig('Unroll_curve.png', dpi=300, bbox_inches='tight')
     plt.close()
@@ -495,41 +466,8 @@ step_increase = 10/9
 beta = lamb_B 
 eta = 1e-4
 for k in range(max_upper_iter):
-    # for j in range(500):
-    #     #compute x(B) with a classical proximal gradient method
-    #     xkn=xk-lamb_x*(torch.matmul(Bk.transpose(0,1),torch.matmul(Bk,xk)-ydelta))-lamb_x*al_adp_l2*xk
-    #     xkn=proxl1(xkn,al_adp_l1*lamb_x)
-    #     if torch.linalg.norm(torch.matmul(Bk,xkn)-ydelta + al_adp_l1*torch.sign(xkn) + al_adp_l2*xkn) <= eps:
-    #         lower_iter.append(j+1)
-    #         break
-    #     xk=xkn
-    # lower_iter_MAID.append(500)
     xk, lower_count = lower_solver(xk, Bk, ydelta, lamb_x, al_adp_l1, al_adp_l2, h, 500, eps, lower_count)
-    #compute the gradient of x(B) w.r.t. B
-    # Axy = torch.matmul(A, xkn) - ydelta
-    # xi = torch.matmul(A.transpose(0,1),Axy)
-    
-    # step = (1-al_adp_l2)*xkn - torch.matmul(Bk.transpose(0,1), torch.matmul(Bk,xkn)- ydelta) 
-    
-    # IdBB = (1-al_adp_l2)*eye - torch.matmul(Bk.transpose(0,1),Bk)
-    # for i in range(step.shape[0]):
-    #     if abs(step[i])<al_adp_l1:
-    #         IdBB[i,:] = 0 
-    
-    # v= torch.linalg.solve(eye - IdBB,xi)
-    
-    # for i in range(step.shape[0]):
-    #     if abs(step[i])<al_adp_l1:
-    #         v[i,:] = 0 
-    
-    # first = h*torch.matmul(torch.matmul(Bk,xk),v.transpose(0,1))
-    # second = h*torch.matmul(torch.matmul(Bk,v),xk.transpose(0,1))
-    # third = h*torch.matmul(ydelta,v.transpose(0,1))
-    
-    # gradB = -first-second+third
-    # Bk = Bk - lamb_B*gradB
     # line search loop
- 
     for i in range(5):
         grad_B = grad_B_func(xk, Bk, ydelta, al_adp_l2, h)
         g_old = loss_MAID[-1]
@@ -553,23 +491,10 @@ for k in range(max_upper_iter):
     loss_MAID.append(0.5* torch.linalg.norm(torch.matmul(A,xk)-ydelta)**2)
     lower_iter_MAID.append(lower_count)
     time_MAID.append(T.time()-time_start)
-    if ((loss_MAID[-2] - loss_MAID[-1])) < 1e-6 and (loss_MAID[-2] - loss_MAID[-1]) != 0 and k>10:
+    if ((loss_MAID[-2] - loss_MAID[-1])) < 1e-12 and (loss_MAID[-2] - loss_MAID[-1]) != 0 and k>10:
         break
 
-# plt.figure(figsize=(16,8))
-# plt.subplot(1,2,1)
-# plt.plot(t,x,label='truth')
-# plt.plot(t,res_xk,label='adp_IFT')
-# plt.plot(t,ydelta,label='Noisy data')
-# plt.title("psnr IFT: "+str(psnr(ground_truth,xk))+ "\n psnr noisy: "+str(psnr(ground_truth,ydelta)))
-# #plt.plot(t,xinv,'--', color='gray', label='inv', alpha=0.5)
-# plt.legend(loc='best')
-# plt.subplot(1,2,2)
-# plt.imshow(res_Bk,vmin=res_Bk.min(),vmax=res_Bk.max())
-# plt.colorbar()
-# plt.savefig('B_adp.png', dpi=300, bbox_inches='tight')
-# plt.close()
-# First plot: Line plot
+
 plt.figure(figsize=(8, 8))
 plt.plot(t, x, label='truth')
 plt.plot(t, res_xk, label='ADP MAID')
@@ -585,11 +510,22 @@ plt.imshow(res_Bk, vmin=res_Bk.min(), vmax=res_Bk.max())
 plt.colorbar()
 plt.savefig('B_MAID.png', dpi=300, bbox_inches='tight')
 plt.close()
+logs = torch.load('1D_logs.pth')
+time = logs["time_IFT"]
+loss = logs["loss_IFT"]
+time_MAID = logs["time_MAID"]
+loss_MAID = logs["loss_MAID"]
+time_unroll = logs["time_unroll"]
+loss_unroll = logs["loss_unroll"]
+unroll_iter = logs["iter_unroll"]
+lower_iter = logs["iter_IFT"]
+lower_iter_MAID = logs["iter_MAID"]
+
 # Time and computational cost comparison
-plt.plot(time,loss,label='High accuracy IFT')
 plt.plot(time_MAID,loss_MAID,label='MAID')
-plt.plot(time_unroll,loss_unroll,label='Unrolled')
-plt.legend(fontsize=22)
+plt.plot(time,loss,label='High accuracy IFT')
+plt.plot(time_unroll,loss_unroll,label='LISTA $L=\infty$')
+plt.legend(fontsize=20)
 plt.yscale('log')   
 plt.xlabel('time [s]')
 plt.ylabel('Upper-level loss')
@@ -602,11 +538,16 @@ lower_iter[0] = 1
 unroll_iter[0] = 1
 plt.plot(lower_iter_MAID, loss_MAID,label='MAID')
 plt.plot(lower_iter, loss,label='High accuracy IFT')
-plt.plot(unroll_iter, loss_unroll,label='Unrolled')
-plt.legend()
+plt.plot(unroll_iter, loss_unroll,label='LISTA $L=\infty$')
+plt.legend(fontsize=20)
 plt.yscale('log')
 plt.xscale('log')
+plt.xticks([1e1, 1e3, 1e5, 1e6])
 plt.xlabel('Lower-level iterations')
 plt.ylabel('Upper-level loss')
 plt.savefig('1D_comparison_iter.png', dpi=300, bbox_inches='tight')
 plt.close()
+
+# Save logs
+# logs ={"iter_MAID": lower_iter_MAID, "loss_MAID": loss_MAID, "time_MAID": time_MAID, "iter_unroll": unroll_iter, "loss_unroll": loss_unroll, "time_unroll": time_unroll, "iter_IFT": lower_iter, "loss_IFT": loss, "time_IFT": time}
+# torch.save(logs, '1D_logs.pth')
