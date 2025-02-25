@@ -57,12 +57,17 @@ The code implements the Analytical Deep Priors (ADP) approach for deblurring and
     * The reconstructed images are saved in the same directory as the script.
 
 ## Results
-<img src="Results/ADP.png" alt="Deblurred image result" width="500">
+
+## Reconstructions in deblurring with a motion blur
+<img src="Results/ADP.png" alt="Deblurred image result" width="1000">
 
 ## Perfomance comparison 
 <img src="Results/curve.png" alt="Deblurred image result" width="800">
+Comparison of ADP IFT, ADP LISTA and ADP-𝛽-MAID in terms of upper-level loss as a
+function of wall-clock time and lower-level iterations
 
 ## Resulting kernels
 <img src="Results/kernel.png" alt="Deblurred image result" width="800">
+Kernels (first channel) of the 2D motion blur forward operator. (a) Initial kernel 𝑏0. (b)
+Optimal kernel 𝑏∗ recovered by ADP-𝛽-MAID. (c) Difference
 
-<img src="Results/ADP.png" alt="Deblurred image result" width="1000">
