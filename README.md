@@ -72,7 +72,8 @@ Kernels (first channel) of the 2D motion blur forward operator. (a) Initial kern
 Optimal kernel 𝑏∗ recovered by ADP-𝛽-MAID. (c) Difference
 
 #How to cite 
-*@misc{salehi2025fastinexactbileveloptimization,
+'''bash 
+@misc{salehi2025fastinexactbileveloptimization,
       title={Fast Inexact Bilevel Optimization for Analytical Deep Image Priors}, 
       author={Mohammad Sadegh Salehi and Tatiana A. Bubba and Yury Korolev},
       year={2025},
@@ -80,4 +81,4 @@ Optimal kernel 𝑏∗ recovered by ADP-𝛽-MAID. (c) Difference
       archivePrefix={arXiv},
       primaryClass={math.OC},
       url={https://arxiv.org/abs/2502.09758}, 
-}*
+} '''
