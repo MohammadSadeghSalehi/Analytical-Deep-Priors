@@ -1,6 +1,6 @@
 # Fast Inexact Bilevel Optimization for Analytical Deep Image Priors
 
-This repository contains the code implementation for the fast analytical deep image priors (ADP) method presented in the paper "Fast Inexact Bilevel Optimization for Analytical Deep Image Priors" (Salehi, M.S. et al.), accepted for presentation at the 10th International Conference on Scale Space and Variational Methods in Computer Vision (SSVM). This method leverages an analytical, explainable framework for Deep Image Priors (DIP) as a black box. It addresses the issue of extensive computations and slow behavior of traditional ADP by using the Method of Adaptive Inexact Descent (MAID) to solve the corresponding bilevel problem adaptively and cost-efficiently.
+This repository contains the code implementation for the fast analytical deep image priors (ADP) method presented in the paper "Fast Inexact Bilevel Optimization for Analytical Deep Image Priors" (M. S. Salehi, T. A. Bubba, Y. Korolev), accepted for presentation at the 10th International Conference on Scale Space and Variational Methods in Computer Vision (SSVM). This method leverages an analytical, explainable framework for Deep Image Priors (DIP) as a black box. It addresses the issue of extensive computations and slow behavior of traditional ADP by using the Method of Adaptive Inexact Descent (MAID) to solve the corresponding bilevel problem adaptively and cost-efficiently.
 
 ## Paper Reference
 
