@@ -71,14 +71,15 @@ function of wall-clock time and lower-level iterations
 Kernels (first channel) of the 2D motion blur forward operator. (a) Initial kernel 𝑏0. (b)
 Optimal kernel 𝑏∗ recovered by ADP-𝛽-MAID. (c) Difference
 
-#How to cite 
-'''bash 
-@misc{salehi2025fastinexactbileveloptimization,
+**How to cite**
+
+    ```bash
+    @misc{salehi2025fastinexactbileveloptimization,
       title={Fast Inexact Bilevel Optimization for Analytical Deep Image Priors}, 
       author={Mohammad Sadegh Salehi and Tatiana A. Bubba and Yury Korolev},
       year={2025},
       eprint={2502.09758},
       archivePrefix={arXiv},
       primaryClass={math.OC},
-      url={https://arxiv.org/abs/2502.09758}, 
-} '''
+      url={https://arxiv.org/abs/2502.09758}
+    ```
