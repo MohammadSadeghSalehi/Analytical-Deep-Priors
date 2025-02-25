@@ -4,16 +4,11 @@ This repository contains the code implementation for the fast analytical deep im
 
 ## Paper Reference
 [![Fast Inexact Bilevel Optimization for Analytical Deep Image Priors](https://img.shields.io/badge/arXiv-PDF-b31b1b)](https://arxiv.org/abs/2412.06436)
-
-This repository contains the official implementation of the paper "An Adaptively Inexact Method for Bilevel Learning Using Primal-Dual Style Differentiation".
+[Fast Inexact Bilevel Optimization for Analytical Deep Image Priors](https://arxiv.org/pdf/2502.09758) (Accepted for presentation at SSVM 2025)
 
 [Mohammad Sadegh Salehi](https://scholar.google.com/citations?user=bunZmJsAAAAJ&hl=en),
 [Tatiana A. Bubba](https://scholar.google.com/citations?user=021dI38AAAAJ&hl=en), 
 [Yury Korolev](https://scholar.google.com/citations?user=8ujezqwAAAAJ&hl=en), 
-
-
-[Fast Inexact Bilevel Optimization for Analytical Deep Image Priors](https://arxiv.org/pdf/2502.09758) (Accepted for presentation at SSVM 2025)
-
 
 ## Description
 
