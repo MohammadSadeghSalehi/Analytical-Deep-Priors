@@ -57,4 +57,4 @@ The code implements the Analytical Deep Priors (ADP) approach for deblurring and
     * The reconstructed images are saved in the same directory as the script.
 
 ## Results
-![Deblurred image result](Results/ADP.png)
+<img src="Results/ADP.png" alt="Deblurred image result" width="500">
