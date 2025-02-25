@@ -59,6 +59,10 @@ The code implements the Analytical Deep Priors (ADP) approach for deblurring and
 ## Results
 <img src="Results/ADP.png" alt="Deblurred image result" width="500">
 
-<img src="Results/curve.png" alt="Deblurred image result" width="500">
+## Perfomance comparison 
+<img src="Results/curve.png" alt="Deblurred image result" width="800">
 
-<img src="Results/kernel.png" alt="Deblurred image result" width="500">
+## Resulting kernels
+<img src="Results/kernel.png" alt="Deblurred image result" width="800">
+
+<img src="Results/ADP.png" alt="Deblurred image result" width="1000">
